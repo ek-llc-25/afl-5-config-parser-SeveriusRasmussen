@@ -52,43 +52,111 @@ struct config_t *read_config(char *filename) {
         // Efter `buf2` er allokeret og config-linjen er kopieret ind, skal
         // pointeren gemmes i vores datastruktur, så den ikke går tabt. Den
         // gemmes på plads `config->count` som er seneste ubrugte plads.
-        config->lines[config->count] = buf2; // brug setting_converter()
+        //Gamle kode: config->lines[config->count] = buf2; // brug setting_converter()
+        struct setting_t *s = setting_converter(buf2);
+        if (s != NULL)
+        {
+            config->lines[config->count] = s;
+            config->count += 1;
+        }
+        free(buf2); // Vi har kopier i s->name/s->value
 
         // `count` forøges så næste config-linjes buffer gemmes på næste plads.
-        config->count += 1;
+        //Gamle kode: config->count += 1;
     }
 
     return config;
 }
 
 struct setting_t *setting_converter(char *line) {
-    // TODO: Allokér en struct setting_t (vha. malloc())
-    struct setting_t *setting = malloc(sizeof(struct setting_t));
+    if (line == NULL) return NULL;
 
-    // Jeg skal bygge en lille parser der laver "name = Simon" om til to strings.
+    // Fjern newline hvis der er en
+    size_t len = strlen(line);
+    if (len > 0 && line[len - 1] == '\n')
+    {
+        line[len - 1] = '\0';
+    }
+
     // Loop hen over pladserne i `line` indtil du støder på et `=`. Så ved du at
     // name-delen slutter og at value-delen begynder. Skal man lave to allokeringer
     // eller findes der en måde at genbruge `line`? Der findes flere løsninger, og
     // det er din opgave at vælge en løsning her.
+    // Find '='
+    char *eq = strchr(line, '=');
+    if (eq == NULL)
+    {
+        return NULL; //ugyldig linje
+    }
+
+    // Jeg skal bygge en lille parser der laver "name = Simon" om til to strings.
+    // Del strengen i to dele:
+    *eq = '\0'; // Nu er 'line' kun name-delen, og eq+1 er value-delen
+    char *name = line;
+    char *value = eq + 1;
+
+    //Trim whitespaces
+    // foran name
+    while (*name == ' ' || *name == '\t') name++;
+    // foran value
+    while (*value == ' ' || *value == '\t') value++;
+    // bagved name
+    char *end = name + strlen(name) - 1;
+    while (end > name && (*end == ' ' || *end == '\t'))
+    {
+        *end = '\0';
+        end--;
+    }
+    // bagved value
+    end = value + strlen(value) - 1;
+    while (end > value && (*end == ' ' || *end == '\t'))
+    {
+        *end = '\0';
+        end--;
+    }
+
+    // Hvis enten name eller value er tomt -> ugyldigt.
+    if (strlen(name) == 0 || strlen(value) == 0)
+    {
+        return NULL;
+    }
+
+    // TODO: Allokér en struct setting_t (vha. malloc())
+    struct setting_t *setting = malloc(sizeof(struct setting_t));
+    if (setting == NULL) return NULL;
 
     // TODO: Find navnet på setting'en i *line
     // TODO: Find værdien på setting'en i *line
-
+    // TODO: return den setting hvor felterne er sat
+    // Allokér og kopier name og value med fejlhåndtring
+    setting->name = malloc(strlen(name) + 1);
+    setting->value = malloc(strlen(value) + 1);
+    if ( setting->name == NULL || setting->value == NULL)
+    {
+        free(setting->name);
+        free(setting->value);
+        free(setting);
+        return NULL;
+    }
+    strcpy(setting->name, name);
+    strcpy(setting->value, value);
+    /* Gamle kode:
     setting->name = NULL; // skal ændres
     setting->value = NULL; // skal ændres
+    */
 
-    // TODO: return den setting hvor felterne er sat
     return setting;
 }
 
 void print_setting(struct setting_t *setting) {
     // TODO: Print en enkelt setting's name og value
+    printf("%s = %s\n", setting->name, setting->value);
 }
 
 void print_config(struct config_t *config) {
     for (int i = 0; i < config->count; i++) {
-        printf("Setting: %s", config->lines[i]);
-        // print_setting(config->lines[i]);
+        //printf("Setting: %s", config->lines[i]);
+        print_setting(config->lines[i]);
     }
 }
 
@@ -101,6 +169,8 @@ void free_config(struct config_t *config) {
     }
 
     for (int i = 0; i < config->count; i++) {
+        free(config->lines[i]->name);
+        free(config->lines[i]->value);
         free(config->lines[i]);
     }
 
